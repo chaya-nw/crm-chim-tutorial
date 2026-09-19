@@ -196,6 +196,7 @@ read_crm_sizes <- function(prior_spec, generation_method, cap_method) {
   results_folder <- here::here(
     "bayesian_crm",
     "results",
+    "sim_1000",
     paste0(
       "bcrm_",
       prior_spec,

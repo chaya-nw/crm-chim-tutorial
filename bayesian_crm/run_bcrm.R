@@ -1,12 +1,50 @@
+# =============================================================================
 # Run Bayesian CRM dose-finding simulations
-
-#Preamble
-#Date
-#Author
-#Paper
-#Exaplain the input options in relation with the paper's terms
-
-
+# =============================================================================
+#
+# Purpose:
+#   This script runs the Bayesian continual reassessment method (CRM)
+#   simulation study described in the accompanying manuscript.
+#   Simulations may be conducted using either randomly generated dose-response parameter
+#   values (prior-predictive evaluation) or five prespecified scenarios.
+#
+# Dose-finding design:
+#   Participants are enrolled in cohorts of five, beginning at 10^4 CFU.
+#   After each completed cohort, the Bayesian dose-response model is updated
+#   using all accumulated infection outcomes. The dose for the subsequent
+#   cohort is then selected according to the prespecified allocation rules.
+#   Candidate challenge doses range from 10^3 to 10^7 CFU.
+#
+# Stopping rules:
+#   Both capped and uncapped versions continue until 20 participants have
+#   been challenged at the currently administered CRM-recommended dose,
+#   including participants previously challenged at that dose. The capped
+#   version additionally stops before enrolling a cohort that would cause
+#   the total sample size to exceed N_cap.
+#
+# Parameter-generation methods:
+#   "random"    - Runs a prior-predictive evaluation using one generated
+#                 true parameter set per simulated trial.
+#   "scenarios" - Runs repeated trials under each of five fixed scenarios
+#                 selected from the true log10(ID70) distribution.
+#
+# Prior specifications:
+#   "id70_p" - Primary specification:
+#              prior distributions are placed on log(a) and log10(ID70).
+#   "ab_p"   - Alternative specification:
+#              prior distributions are placed on log(a) and log(b).
+#
+# Capping options:
+#   "capped"   - Applies the maximum total sample size N_cap.
+#   "uncapped" - Does not apply a maximum total sample size.
+#
+# Author: Chaya Weerasinghe
+# Date  : September 2026
+# Associated paper:
+#   "Weerasinghe, C., Osowicki, J., Simpson, J. A., Crocker-Buque, T., McCarthy, J., Williams, E., & Price,
+#    D. J. (2026). Rationale and guidance for implementing the continual reassessment method for dosefinding
+#    in controlled human infection model studies."
+# =============================================================================
 
 
 # -------------------------------------------------------------------------

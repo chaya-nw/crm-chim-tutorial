@@ -92,6 +92,7 @@ if (design_method == "rule_based") {
   results_folder <- here::here(
     "bayesian_crm",
     "results",
+    "sim_1000",
     paste0(
       "bcrm_",
       prior_spec,
