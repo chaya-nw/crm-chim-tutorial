@@ -1,0 +1,917 @@
+---
+title: "Simulation Results - Figures"
+output: html_document
+date: "2026-09-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## Main manuscript figures
+
+```{r}
+# Generate operating-characteristic summaries for the rule-based and Bayesian CRM dose-finding designs
+library(here)
+library(tidyverse)
+library(kableExtra)
+library(ggplot2)
+library(patchwork)
+library(scales)
+library(truncnorm)
+
+# -------------------------------------------------------------------------
+# Load help functions to create figures
+# -------------------------------------------------------------------------
+source(here::here("fig_tables", "R", "fig_helpers.R"))
+```
+
+
+
+### Figure 1 - Conceptual illustration of a monotonic dose-response relationship used in dose-finding studies
+```{r}
+# Create dose grid
+dose <- seq(0, 10, length.out = 200)
+
+# Target levels
+TTL <- 0.25
+target_inf <- 0.70
+
+fig1 <- create_fig_concept(dose, TTL, target_inf)
+fig1
+
+ggsave(here::here("fig_tables", "save_plots","concept_fig.eps"), width = 6, height = 5, dpi = 300)
+```
+
+
+
+### Figure 2 - Example dose-response curves under several commonly used models
+```{r}
+fig2 <- create_fig_ds_curves()
+fig2
+
+ggsave(here::here("fig_tables", "save_plots","dif_drmodels_fig.eps"), width = 8, height = 5, dpi = 300)
+```
+
+
+
+
+
+### Figure 3 - Illustration of posterior updating and adaptive dose allocation in the Bayesian CRM
+```{r}
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select prior: "id70_p" or "ab_p"; id70_p = Prior on a and log10(ID70); ab_p = Prior on a and b
+prior_spec <- "id70_p"
+
+
+cap_method <- "capped"
+
+
+example_scenario <- 4
+example_sim <- 45
+
+
+# Prior distribution settings for a and log10(ID70)
+# id70_p
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log10(ID70) ~ Normal(log10_id70_mean, log10_id70_sd^2),
+# truncated to (log10_id70_lower, log10_id70_upper)
+
+id70_settings <- list(
+  a_lower = 0.3,
+  a_upper = 0.8,
+  log10_id70_mean = 4,
+  log10_id70_sd = 0.8,
+  log10_id70_lower = 3,
+  log10_id70_upper = 7
+)
+
+
+# Distribution settings for a and b
+# ab_p
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log(b) ~ Uniform(log(b_lower), log(b_upper))
+
+ab_settings <- list(
+  a_lower = 0.1,
+  a_upper = 0.7,
+  b_lower = 20,
+  b_upper = 600
+)
+
+
+example_output_folder <- here::here(
+  "bayesian_crm",
+  "results",
+  "examples",
+  paste0(
+    "scenario_",
+    example_scenario,
+    "_sim_",
+    example_sim,
+    "_",
+    prior_spec,
+    "_",
+    cap_method
+  )
+)
+
+trial_dat <- readr::read_csv(
+  file.path(
+    example_output_folder,
+    "learning_trial_dat.csv"
+  ),
+  show_col_types = FALSE
+)
+
+post_curves <- readr::read_csv(
+  file.path(
+    example_output_folder,
+    "learning_post_curves.csv"
+  ),
+  show_col_types = FALSE
+)
+
+scenarios <- readr::read_csv(
+  here::here(
+    "data",
+    paste0(
+      "pars_scenarios_",
+      prior_spec,
+      ".csv"
+    )
+  ),
+  show_col_types = FALSE
+)
+
+posterior_updating_plot <- create_fig_posterior_updating(
+    trial_dat          = trial_dat,
+    post_curves        = post_curves,
+    true_a             = scenarios$a[example_scenario],
+    true_b             = scenarios$b[example_scenario],
+    id70_settings      = id70_settings,
+    target_prob        = 0.70,
+    n_cohorts_to_plot  = 5
+  )
+
+posterior_updating_plot
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Figure 4 - Distribution of trial sizes under the rule-based and Bayesian CRM designs (uncapped and capped) across 1000 prior predictive simulations
+```{r}
+#-----------------------------
+# Load capped + uncapped results
+#-----------------------------
+rule_cap   <- read_rulebased_sizes("id70_p", "random", "capped")
+rule_uncap <- read_rulebased_sizes("id70_p", "random", "uncapped")
+
+crm_cap    <- read_crm_sizes("id70_p", "random", "capped")
+crm_uncap  <- read_crm_sizes("id70_p", "random", "uncapped")
+
+
+fig4 <- create_fig_trial_size_random(rule_cap, rule_uncap, crm_cap, crm_uncap)
+fig4
+
+ggsave(here::here("fig_tables", "save_plots","trial_sizes_both_id70p.eps"), width = 8, height = 5, dpi = 300)
+```
+
+
+
+### Figure 5 - Prior-predictive dose-response relationship (with Five scenarios overlayed: Prior on ID70 and a)
+```{r}
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select prior: "id70_p" or "ab_p"; id70_p = Prior on a and log10(ID70); ab_p = Prior on a and b
+prior_spec <- "id70_p"
+
+nsamp <- 1000
+
+
+# Prior distribution settings for a and log10(ID70)
+# id70_p
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log10(ID70) ~ Normal(log10_id70_mean, log10_id70_sd^2),
+# truncated to (log10_id70_lower, log10_id70_upper)
+
+id70_settings <- list(
+  a_lower = 0.3,
+  a_upper = 0.8,
+  log10_id70_mean = 4,
+  log10_id70_sd = 0.8,
+  log10_id70_lower = 3,
+  log10_id70_upper = 7
+)
+
+
+# Distribution settings for a and b
+# ab_p
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log(b) ~ Uniform(log(b_lower), log(b_upper))
+
+ab_settings <- list(
+  a_lower = 0.1,
+  a_upper = 0.7,
+  b_lower = 20,
+  b_upper = 600
+)
+
+
+fig5 <- create_fig_prior_pred_with5sc(nsamp, id70_settings, ab_settings, prior_spec)
+fig5
+
+ggsave(here::here("fig_tables", "save_plots","prior_pred_5s_id70p.png"), width = 8, height = 5, dpi = 300)
+```
+
+
+
+### Figure 6 - Distribution of total study sizes across the five scenarios for the capped 5+5+10 rule-based design and capped Bayesian CRM
+```{r}
+
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select: "capped" or "uncapped"
+cap_method <- "capped"
+
+# Select: "random" or "scenarios"
+generation_method <- "scenarios"
+
+# Select prior: "id70_p" or "ab_p"; id70_p = Prior on a and log10(ID70); ab_p = Prior on a and b
+prior_spec <- "id70_p"
+
+
+# -------------------------------------------------------------------------
+# Read simulation results
+# -------------------------------------------------------------------------
+
+# Rule-based results
+sims_file <- here::here(
+    "rule_based",
+    "results",
+    paste0(
+      "rb_",
+      prior_spec,
+      "_",
+      generation_method,
+      "_",
+      cap_method,
+      ".csv"
+    )
+  )
+  
+rule_sims <- readr::read_csv(
+  sims_file, 
+  col_names = c("dose","infected","total","scenario","design","sim","kk"),
+  show_col_types = FALSE
+)
+
+
+# Bayesian CRM results
+results_folder <- here::here(
+  "bayesian_crm",
+  "results",
+  paste0(
+    "bcrm_",
+    prior_spec,
+    "_",
+    generation_method,
+    "_",
+    cap_method
+  )
+)
+  
+sims_file = file.path(
+  results_folder,
+  "sims.csv"
+)
+  
+crm_sims <- readr::read_csv(
+  sims_file, 
+  col_names = c("dose", "infected", "total", "scenario", "design", "sim", "kk"), 
+  show_col_types = FALSE
+)
+  
+fig6 <- create_fig_trial_size_5scn(rule_sims, crm_sims)
+fig6
+
+
+ggsave(here::here("fig_tables", "save_plots","trial_sizes_both_5s_id70p.eps"), width = 8, height = 5, dpi = 300)
+```
+
+
+
+### Figure 7 - Distribution of participants allocated to the target dose across the five scenarios for the capped 5+5+10 rule-based design vs capped Bayesian CRM
+```{r}
+
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select: "capped" or "uncapped"
+cap_method <- "capped"
+
+# Select: "random" or "scenarios"
+generation_method <- "scenarios"
+
+# Select prior: "id70_p" or "ab_p"; id70_p = Prior on a and log10(ID70); ab_p = Prior on a and b
+prior_spec <- "id70_p"
+
+
+# -------------------------------------------------------------------------
+# Read simulation results
+# -------------------------------------------------------------------------
+
+# Rule-based results
+sims_file <- here::here(
+    "rule_based",
+    "results",
+    paste0(
+      "rb_",
+      prior_spec,
+      "_",
+      generation_method,
+      "_",
+      cap_method,
+      ".csv"
+    )
+  )
+  
+rule_sims <- readr::read_csv(
+  sims_file, 
+  col_names = c("dose","infected","total","scenario","design","sim","kk"),
+  show_col_types = FALSE
+)
+
+
+# Bayesian CRM results
+results_folder <- here::here(
+  "bayesian_crm",
+  "results",
+  paste0(
+    "bcrm_",
+    prior_spec,
+    "_",
+    generation_method,
+    "_",
+    cap_method
+  )
+)
+  
+sims_file = file.path(
+  results_folder,
+  "sims.csv"
+)
+  
+crm_sims <- readr::read_csv(
+  sims_file, 
+  col_names = c("dose", "infected", "total", "scenario", "design", "sim", "kk"), 
+  show_col_types = FALSE
+)
+
+
+fig7 <- create_fig_target_5scn(rule_sims, crm_sims)
+fig7
+
+ggsave(here::here("fig_tables", "save_plots","target_d_both_5s_id70p.eps"), width = 8, height = 5, dpi = 300)
+```
+
+
+
+
+
+
+## Appendix figures
+
+
+### Figure 2 - Prior-predictive dose-response relationship (Prior on ID70 and a)
+```{r}
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select prior: "id70_p" or "ab_p"; id70_p = Prior on a and log10(ID70); ab_p = Prior on a and b
+prior_spec <- "id70_p"
+
+nsamp <- 1000
+
+
+# Prior distribution settings for a and log10(ID70)
+# id70_p
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log10(ID70) ~ Normal(log10_id70_mean, log10_id70_sd^2),
+# truncated to (log10_id70_lower, log10_id70_upper)
+
+id70_settings <- list(
+  a_lower = 0.3,
+  a_upper = 0.8,
+  log10_id70_mean = 4,
+  log10_id70_sd = 0.8,
+  log10_id70_lower = 3,
+  log10_id70_upper = 7
+)
+
+
+# Distribution settings for a and b
+# ab_p
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log(b) ~ Uniform(log(b_lower), log(b_upper))
+
+ab_settings <- list(
+  a_lower = 0.1,
+  a_upper = 0.7,
+  b_lower = 20,
+  b_upper = 600
+)
+
+
+fig2_append <- create_fig_prior_pred(nsamp, id70_settings, ab_settings, prior_spec)
+fig2_append
+
+ggsave(here::here("fig_tables", "save_plots","prior_pred_rnd_id70p.png"), width = 8, height = 5, dpi = 300)
+```
+
+
+
+### Figure 3 - Estimated ID70 values obtained under the capped Bayesian CRM for each of the 1000 simulations per scenario (Prior on ID70 and a)
+
+```{r}
+
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select: "capped" or "uncapped"
+cap_method <- "capped"
+
+# Select: "random" or "scenarios"
+generation_method <- "scenarios"
+
+# Select prior: "id70_p" or "ab_p"; id70_p = Prior on a and log10(ID70); ab_p = Prior on a and b
+prior_spec <- "id70_p"
+
+
+
+# -------------------------------------------------------------------------
+# Read simulation results
+# -------------------------------------------------------------------------
+
+# Bayesian results
+results_folder <- here::here(
+  "bayesian_crm",
+  "results",
+  paste0(
+    "bcrm_",
+    prior_spec,
+    "_",
+    generation_method,
+    "_",
+    cap_method
+  )
+)
+  
+id70_file = file.path(
+  results_folder,
+  "est.id70s.csv"
+)
+  
+id70 <- readr::read_csv(
+  id70_file, 
+  col_names = c("q05","q25","q50","q75","q95","sim","n.doses","design","scenario","rn"),
+  show_col_types = FALSE
+)
+
+
+# True scenario data
+pars_file <- here::here(
+    "data",
+    paste0(
+      "pars_scenarios_",
+      prior_spec,
+      ".csv"
+    )
+  )
+
+
+# Rule-based results
+sims_file <- here::here(
+    "rule_based",
+    "results",
+    paste0(
+      "rb_",
+      prior_spec,
+      "_",
+      generation_method,
+      "_",
+      cap_method,
+      ".csv"
+    )
+  )
+  
+rule_sims <- readr::read_csv(
+  sims_file
+  )
+
+
+
+fig3_append <- create_fig_estid70(prior_spec, generation_method, cap_method, id70, pars_file, rule_sims) 
+fig3_append
+
+ggsave(here::here("fig_tables", "save_plots","estid70_5s_id70p_n1000.png"), width = 8, height = 9, dpi = 300)
+```
+
+
+
+
+### Figure 4 - Prior-predictive dose-response relationship (Prior on a and b)
+```{r}
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select prior: "id70_p" or "ab_p"; id70_p = Prior on a and log10(ID70); ab_p = Prior on a and b
+prior_spec <- "ab_p"
+
+nsamp <- 1000
+
+
+# Prior distribution settings for a and log10(ID70)
+# id70_p
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log10(ID70) ~ Normal(log10_id70_mean, log10_id70_sd^2),
+# truncated to (log10_id70_lower, log10_id70_upper)
+
+id70_settings <- list(
+  a_lower = 0.3,
+  a_upper = 0.8,
+  log10_id70_mean = 4,
+  log10_id70_sd = 0.8,
+  log10_id70_lower = 3,
+  log10_id70_upper = 7
+)
+
+
+# Distribution settings for a and b
+# ab_p
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log(b) ~ Uniform(log(b_lower), log(b_upper))
+
+ab_settings <- list(
+  a_lower = 0.1,
+  a_upper = 0.7,
+  b_lower = 20,
+  b_upper = 600
+)
+
+
+fig4_append <- create_fig_prior_pred(nsamp, id70_settings, ab_settings, prior_spec)
+fig4_append
+
+ggsave(here::here("fig_tables", "save_plots","prior_pred_rnd_abp.png"), width = 8, height = 5, dpi = 300)
+```
+
+
+
+
+### Figure 5 - Distribution of trial sizes under the rule-based and Bayesian CRM designs (uncapped and capped) across 1000 prior predictive simulations (Prior on a and b)
+```{r}
+#-----------------------------
+# Load capped + uncapped results
+#-----------------------------
+rule_cap   <- read_rulebased_sizes("ab_p", "random", "capped")
+rule_uncap <- read_rulebased_sizes("ab_p", "random", "uncapped")
+
+crm_cap    <- read_crm_sizes("ab_p", "random", "capped")
+crm_uncap  <- read_crm_sizes("ab_p", "random", "uncapped")
+
+
+fig5_append <- create_fig_trial_size_random(rule_cap, rule_uncap, crm_cap, crm_uncap)
+fig5_append
+
+ggsave(here::here("fig_tables", "save_plots","trial_sizes_both_abp.eps"), width = 8, height = 5, dpi = 300)
+```
+
+
+
+
+
+### Figure 6 - Prior-predictive dose-response relationship (with Five scenarios overlayed: Prior on a and b)
+```{r}
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select prior: "id70_p" or "ab_p"; id70_p = Prior on a and log10(ID70); ab_p = Prior on a and b
+prior_spec <- "ab_p"
+
+nsamp <- 1000
+
+
+# Prior distribution settings for a and log10(ID70)
+# id70_p
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log10(ID70) ~ Normal(log10_id70_mean, log10_id70_sd^2),
+# truncated to (log10_id70_lower, log10_id70_upper)
+
+id70_settings <- list(
+  a_lower = 0.3,
+  a_upper = 0.8,
+  log10_id70_mean = 4,
+  log10_id70_sd = 0.8,
+  log10_id70_lower = 3,
+  log10_id70_upper = 7
+)
+
+
+# Distribution settings for a and b
+# ab_p
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log(b) ~ Uniform(log(b_lower), log(b_upper))
+
+ab_settings <- list(
+  a_lower = 0.1,
+  a_upper = 0.7,
+  b_lower = 20,
+  b_upper = 600
+)
+
+
+fig6_append <- create_fig_prior_pred_with5sc(nsamp, id70_settings, ab_settings, prior_spec)
+fig6_append
+
+ggsave(here::here("fig_tables", "save_plots","prior_pred_5s_abp.png"), width = 8, height = 5, dpi = 300)
+```
+
+
+
+
+### Figure 7 - Distribution of total study sizes across the five scenarios for the capped 5+5+10 rule-based design and capped Bayesian CRM
+```{r}
+
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select: "capped" or "uncapped"
+cap_method <- "capped"
+
+# Select: "random" or "scenarios"
+generation_method <- "scenarios"
+
+# Select prior: "id70_p" or "ab_p"; id70_p = Prior on a and log10(ID70); ab_p = Prior on a and b
+prior_spec <- "ab_p"
+
+
+# -------------------------------------------------------------------------
+# Read simulation results
+# -------------------------------------------------------------------------
+
+# Rule-based results
+sims_file <- here::here(
+    "rule_based",
+    "results",
+    paste0(
+      "rb_",
+      prior_spec,
+      "_",
+      generation_method,
+      "_",
+      cap_method,
+      ".csv"
+    )
+  )
+  
+rule_sims <- readr::read_csv(
+  sims_file, 
+  col_names = c("dose","infected","total","scenario","design","sim","kk"),
+  show_col_types = FALSE
+)
+
+
+# Bayesian CRM results
+results_folder <- here::here(
+  "bayesian_crm",
+  "results",
+  paste0(
+    "bcrm_",
+    prior_spec,
+    "_",
+    generation_method,
+    "_",
+    cap_method
+  )
+)
+  
+sims_file = file.path(
+  results_folder,
+  "sims.csv"
+)
+  
+crm_sims <- readr::read_csv(
+  sims_file, 
+  col_names = c("dose", "infected", "total", "scenario", "design", "sim", "kk"), 
+  show_col_types = FALSE
+)
+  
+fig7_append <- create_fig_trial_size_5scn(rule_sims, crm_sims)
+fig7_append
+
+ggsave(here::here("fig_tables", "save_plots","trial_sizes_both_5s_abp.eps"), width = 8, height = 5, dpi = 300)
+```
+
+
+
+
+
+### Figure 7 - Distribution of participants allocated to the target dose across the five scenarios for the capped 5+5+10 rule-based design vs capped Bayesian CRM
+```{r}
+
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select: "capped" or "uncapped"
+cap_method <- "capped"
+
+# Select: "random" or "scenarios"
+generation_method <- "scenarios"
+
+# Select prior: "id70_p" or "ab_p"; id70_p = Prior on a and log10(ID70); ab_p = Prior on a and b
+prior_spec <- "ab_p"
+
+
+# -------------------------------------------------------------------------
+# Read simulation results
+# -------------------------------------------------------------------------
+
+# Rule-based results
+sims_file <- here::here(
+    "rule_based",
+    "results",
+    paste0(
+      "rb_",
+      prior_spec,
+      "_",
+      generation_method,
+      "_",
+      cap_method,
+      ".csv"
+    )
+  )
+  
+rule_sims <- readr::read_csv(
+  sims_file, 
+  col_names = c("dose","infected","total","scenario","design","sim","kk"),
+  show_col_types = FALSE
+)
+
+
+# Bayesian CRM results
+results_folder <- here::here(
+  "bayesian_crm",
+  "results",
+  paste0(
+    "bcrm_",
+    prior_spec,
+    "_",
+    generation_method,
+    "_",
+    cap_method
+  )
+)
+  
+sims_file = file.path(
+  results_folder,
+  "sims.csv"
+)
+  
+crm_sims <- readr::read_csv(
+  sims_file, 
+  col_names = c("dose", "infected", "total", "scenario", "design", "sim", "kk"), 
+  show_col_types = FALSE
+)
+
+
+fig8_append <- create_fig_target_5scn(rule_sims, crm_sims)
+fig8_append
+
+ggsave(here::here("fig_tables", "save_plots","target_d_both_5s_abp.eps"), width = 8, height = 5, dpi = 300)
+```
+
+
+
+### Figure 3 - Estimated ID70 values obtained under the capped Bayesian CRM for each of the 1000 simulations per scenario (Prior on ID70 and a)
+
+```{r}
+
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select: "capped" or "uncapped"
+cap_method <- "capped"
+
+# Select: "random" or "scenarios"
+generation_method <- "scenarios"
+
+# Select prior: "id70_p" or "ab_p"; id70_p = Prior on a and log10(ID70); ab_p = Prior on a and b
+prior_spec <- "ab_p"
+
+
+
+# -------------------------------------------------------------------------
+# Read simulation results
+# -------------------------------------------------------------------------
+
+# Bayesian results
+results_folder <- here::here(
+  "bayesian_crm",
+  "results",
+  paste0(
+    "bcrm_",
+    prior_spec,
+    "_",
+    generation_method,
+    "_",
+    cap_method
+  )
+)
+  
+id70_file = file.path(
+  results_folder,
+  "est.id70s.csv"
+)
+  
+id70 <- readr::read_csv(
+  id70_file, 
+  col_names = c("q05","q25","q50","q75","q95","sim","n.doses","design","scenario","rn"),
+  show_col_types = FALSE
+)
+
+
+# True scenario data
+pars_file <- here::here(
+    "data",
+    paste0(
+      "pars_scenarios_",
+      prior_spec,
+      ".csv"
+    )
+  )
+
+
+# Rule-based results
+sims_file <- here::here(
+    "rule_based",
+    "results",
+    paste0(
+      "rb_",
+      prior_spec,
+      "_",
+      generation_method,
+      "_",
+      cap_method,
+      ".csv"
+    )
+  )
+  
+rule_sims <- readr::read_csv(
+  sims_file
+  )
+
+
+
+fig9_append <- create_fig_estid70(prior_spec, generation_method, cap_method, id70, pars_file, rule_sims)
+fig9_append
+
+ggsave(here::here("fig_tables", "save_plots","estid70_5s_abp_n1000.png"), width = 8, height = 9, dpi = 300)
+```
+

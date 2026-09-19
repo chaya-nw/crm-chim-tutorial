@@ -1,0 +1,24 @@
+# R and RStudio temporary files
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+
+# macOS files
+.DS_Store
+
+# Quarto temporary files
+.quarto/
+*_cache/
+*_files/
+
+# Compiled Stan/R files
+*.o
+*.so
+*.dll
+*.dylib
+
+# Temporary files
+*.log
+*.tmp
+~$*

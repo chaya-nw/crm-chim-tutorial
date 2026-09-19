@@ -1,0 +1,691 @@
+---
+title: "Simulation Results Tables"
+output: html_document
+date: "2026-09-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## Main manuscript tables: prior on ID70 and a
+
+```{r}
+# Generate operating-characteristic summaries for the rule-based and Bayesian CRM dose-finding designs
+library(here)
+library(tidyverse)
+library(kableExtra)
+
+# -------------------------------------------------------------------------
+# Load summary functions
+# -------------------------------------------------------------------------
+source(here::here("fig_tables", "R", "rb_summary.R"))
+source(here::here("fig_tables", "R", "bcrm_summary.R"))
+source(here::here("fig_tables", "R", "get_sim_sum.R"))
+source(here::here("fig_tables", "R", "tab_helpers.R"))
+```
+
+
+### Table 2
+```{r}
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select: "id70_p" or "ab_p"
+prior_spec <- "id70_p"
+
+# Select: "random" or "scenarios"
+generation_method <- "random"
+
+# Candidate dose grid
+dose_grid <- 10^(3:7)
+
+# -------------------------------------------------------------------------
+# Obtain all four summaries
+# -------------------------------------------------------------------------
+simulation_summaries <- get_all_simulation_summaries(
+  generation_method = generation_method,
+  prior_spec = prior_spec,
+  dose_grid = dose_grid,
+  cap_methods = c("uncapped", "capped")
+)
+
+
+# -------------------------------------------------------------------------
+# Create the table
+# -------------------------------------------------------------------------
+sample_size_table <- create_sample_size_tab(
+  simulation_summaries
+)
+
+# Display the table
+sample_size_table %>%
+  kable(
+    caption = paste(
+      "Table 2. Summary of total sample sizes across 1,000 prior-predictive",
+      "simulations for the rule-based and Bayesian CRM designs under",
+      "uncapped and capped settings. Here, $N$ denotes the number of participants."
+    ),
+    col.names = c("Statistic", "Rule-based", "Bayesian CRM", "Rule-based","Bayesian CRM"),
+    booktabs = TRUE,
+    align = c("l", "c", "c", "c", "c"),
+    escape = FALSE
+  ) %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Panel A: Uncapped" = 2,
+      "Panel B: Capped" = 2
+    ),
+    bold = TRUE,
+    escape = FALSE
+  ) %>%
+  column_spec(1, width = "19em") %>%
+  column_spec(2:5, width = "10em") %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c(
+      "striped",
+      "hover",
+      "condensed",
+      "bordered"
+    ),
+    latex_options = c(
+      "hold_position",
+      "scale_down"
+    )
+  )
+```
+
+
+
+
+### Table 3
+```{r}
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select: "id70_p" or "ab_p"
+prior_spec <- "id70_p"
+
+# Select: "random" or "scenarios"
+generation_method <- "scenarios"
+
+# Candidate dose grid
+dose_grid <- 10^(3:7)
+
+
+# -------------------------------------------------------------------------
+# Obtain all four summaries
+# -------------------------------------------------------------------------
+scenario_summaries <- get_all_simulation_summaries(
+  generation_method = generation_method,
+  prior_spec = prior_spec,
+  dose_grid = dose_grid,
+  cap_methods = "capped"
+)
+
+
+# -------------------------------------------------------------------------
+# Create the table
+# -------------------------------------------------------------------------
+scenario_oc_table <- create_scenario_oc_tab(
+  scenario_summaries
+)
+
+scenario_oc_table %>%
+  kable(
+    caption = paste(
+      "Table 3. Scenario-specific operating characteristics for the",
+      "rule-based design and Bayesian CRM under the capped setting."
+    ),
+    booktabs = TRUE,
+    align = c("l", rep("c", 5)),
+    escape = FALSE,
+    col.names = c("Operating characteristic", "1", "2", "3", "4", "5")
+  ) %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Scenario" = 5
+    ),
+    bold = TRUE
+  ) %>%
+  row_spec(
+    1,
+    bold = TRUE
+  ) %>%
+  pack_rows(
+    "Panel A: Rule-based design",
+    start_row = 2,
+    end_row = 6,
+    bold = TRUE
+  ) %>%
+  pack_rows(
+    "Panel B: Bayesian CRM",
+    start_row = 7,
+    end_row = 11,
+    bold = TRUE
+  ) %>%
+  column_spec(1, width = "22em") %>%
+  column_spec(2:6, width = "7em") %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c(
+      "striped",
+      "hover",
+      "condensed",
+      "bordered"
+    ),
+    latex_options = c(
+      "hold_position",
+      "scale_down"
+    )
+  )
+```
+
+
+
+
+
+
+## Appendix tables: prior on ID70 and a
+
+
+### Table 1
+
+
+
+
+
+### Table 2
+
+```{r}
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select: "id70_p" or "ab_p"
+prior_spec <- "id70_p"
+
+# Select: "random" or "scenarios"
+generation_method <- "scenarios"
+
+# Candidate dose grid
+dose_grid <- 10^(3:7)
+
+# -------------------------------------------------------------------------
+# Obtain all four summaries
+# -------------------------------------------------------------------------
+scenario_summaries <- get_all_simulation_summaries(
+  generation_method = generation_method,
+  prior_spec = prior_spec,
+  dose_grid = dose_grid,
+  cap_methods = "capped"
+)
+
+# -------------------------------------------------------------------------
+# Create the table
+# -------------------------------------------------------------------------
+scenario_performance_table <-
+  create_scenario_performance_tab(
+    scenario_summaries
+  )
+
+scenario_performance_table %>%
+  kable(
+    caption = paste(
+      "Table 2. Scenario-specific operating characteristics for the",
+      "rule-based design and Bayesian CRM under the capped setting.",
+      "Here, $N$ denotes the number of participants."
+    ),
+    booktabs = TRUE,
+    align = c(
+      "l",
+      rep("c", 5)
+    ),
+    escape = FALSE,
+    col.names = c("Operating characteristic", "1", "2", "3", "4", "5")
+  ) %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Scenario" = 5
+    ),
+    bold = TRUE
+  ) %>%
+  row_spec(
+    1,
+    bold = TRUE
+  ) %>%
+  pack_rows(
+    "Panel A: Rule-based design",
+    start_row = 2,
+    end_row = 4,
+    bold = TRUE
+  ) %>%
+  pack_rows(
+    "Panel B: Bayesian CRM",
+    start_row = 5,
+    end_row = 10,
+    bold = TRUE
+  ) %>%
+  column_spec(1, width = "20em") %>%
+  column_spec(2:6, width = "6em") %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c(
+      "striped",
+      "hover",
+      "condensed",
+      "bordered"
+    ),
+    latex_options = c(
+      "hold_position",
+      "scale_down"
+    )
+  )
+
+```
+
+
+
+## Appendix tables: prior on a and b
+
+### Table 3 
+
+```{r}
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select: "id70_p" or "ab_p"
+prior_spec <- "ab_p"
+
+# Select: "random" or "scenarios"
+generation_method <- "random"
+
+# Candidate dose grid
+dose_grid <- 10^(3:7)
+
+# -------------------------------------------------------------------------
+# Obtain all four summaries
+# -------------------------------------------------------------------------
+simulation_summaries <- get_all_simulation_summaries(
+  generation_method = generation_method,
+  prior_spec = prior_spec,
+  dose_grid = dose_grid,
+  cap_methods = c("uncapped", "capped")
+)
+
+
+# -------------------------------------------------------------------------
+# Create the table
+# -------------------------------------------------------------------------
+sample_size_table <- create_sample_size_tab(
+  simulation_summaries
+)
+
+# Display the table
+sample_size_table %>%
+  kable(
+    caption = paste(
+      "Table 3. Summary of total sample sizes across 1,000 prior-predictive",
+      "simulations for the rule-based and Bayesian CRM designs under",
+      "uncapped and capped settings. Here, $N$ denotes the number of participants."
+    ),
+    col.names = c("Statistic", "Rule-based", "Bayesian CRM", "Rule-based","Bayesian CRM"),
+    booktabs = TRUE,
+    align = c("l", "c", "c", "c", "c"),
+    escape = FALSE
+  ) %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Panel A: Uncapped" = 2,
+      "Panel B: Capped" = 2
+    ),
+    bold = TRUE,
+    escape = FALSE
+  ) %>%
+  column_spec(1, width = "19em") %>%
+  column_spec(2:5, width = "10em") %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c(
+      "striped",
+      "hover",
+      "condensed",
+      "bordered"
+    ),
+    latex_options = c(
+      "hold_position",
+      "scale_down"
+    )
+  )
+```
+
+
+
+
+### Table 4
+```{r}
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select: "id70_p" or "ab_p"
+prior_spec <- "ab_p"
+
+# Select: "random" or "scenarios"
+generation_method <- "scenarios"
+
+# Candidate dose grid
+dose_grid <- 10^(3:7)
+
+# -------------------------------------------------------------------------
+# Obtain all four summaries
+# -------------------------------------------------------------------------
+scenario_summaries <- get_all_simulation_summaries(
+  generation_method = generation_method,
+  prior_spec = prior_spec,
+  dose_grid = dose_grid,
+  cap_methods = "capped"
+)
+
+
+# -------------------------------------------------------------------------
+# Create the table
+# -------------------------------------------------------------------------
+scenario_oc_table <- create_scenario_oc_tab(
+  scenario_summaries
+)
+
+scenario_oc_table %>%
+  kable(
+    caption = paste(
+      "Table 4. Scenario-specific operating characteristics for the",
+      "rule-based design and Bayesian CRM under the capped setting."
+    ),
+    booktabs = TRUE,
+    align = c("l", rep("c", 5)),
+    escape = FALSE,
+    col.names = c("Operating characteristic", "1", "2", "3", "4", "5")
+  ) %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Scenario" = 5
+    ),
+    bold = TRUE
+  ) %>%
+  row_spec(
+    1,
+    bold = TRUE
+  ) %>%
+  pack_rows(
+    "Panel A: Rule-based design",
+    start_row = 2,
+    end_row = 6,
+    bold = TRUE
+  ) %>%
+  pack_rows(
+    "Panel B: Bayesian CRM",
+    start_row = 7,
+    end_row = 11,
+    bold = TRUE
+  ) %>%
+  column_spec(1, width = "22em") %>%
+  column_spec(2:6, width = "7em") %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c(
+      "striped",
+      "hover",
+      "condensed",
+      "bordered"
+    ),
+    latex_options = c(
+      "hold_position",
+      "scale_down"
+    )
+  )
+```
+
+
+
+### Table 5
+```{r}
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Select: "id70_p" or "ab_p"
+prior_spec <- "ab_p"
+
+# Select: "random" or "scenarios"
+generation_method <- "scenarios"
+
+# Candidate dose grid
+dose_grid <- 10^(3:7)
+
+# -------------------------------------------------------------------------
+# Obtain all four summaries
+# -------------------------------------------------------------------------
+scenario_summaries <- get_all_simulation_summaries(
+  generation_method = generation_method,
+  prior_spec = prior_spec,
+  dose_grid = dose_grid,
+  cap_methods = "capped"
+)
+
+# -------------------------------------------------------------------------
+# Create the table
+# -------------------------------------------------------------------------
+scenario_performance_table <-
+  create_scenario_performance_tab(
+    scenario_summaries
+  )
+
+scenario_performance_table %>%
+  kable(
+    caption = paste(
+      "Table 5. Scenario-specific operating characteristics for the",
+      "rule-based design and Bayesian CRM under the capped setting.",
+      "Here, $N$ denotes the number of participants."
+    ),
+    booktabs = TRUE,
+    align = c(
+      "l",
+      rep("c", 5)
+    ),
+    escape = FALSE,
+    col.names = c("Operating characteristic", "1", "2", "3", "4", "5")
+  ) %>%
+  add_header_above(
+    c(
+      " " = 1,
+      "Scenario" = 5
+    ),
+    bold = TRUE
+  ) %>%
+  row_spec(
+    1,
+    bold = TRUE
+  ) %>%
+  pack_rows(
+    "Panel A: Rule-based design",
+    start_row = 2,
+    end_row = 4,
+    bold = TRUE
+  ) %>%
+  pack_rows(
+    "Panel B: Bayesian CRM",
+    start_row = 5,
+    end_row = 10,
+    bold = TRUE
+  ) %>%
+  column_spec(1, width = "20em") %>%
+  column_spec(2:6, width = "6em") %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c(
+      "striped",
+      "hover",
+      "condensed",
+      "bordered"
+    ),
+    latex_options = c(
+      "hold_position",
+      "scale_down"
+    )
+  )
+```
+
+
+
+### Prior-implied skeleton
+```{r}
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+
+# Prior distribution settings for a and log10(ID70)
+# id70_p
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log10(ID70) ~ Normal(log10_id70_mean, log10_id70_sd^2),
+# truncated to (log10_id70_lower, log10_id70_upper)
+
+id70_settings <- list(
+  a_lower = 0.3,
+  a_upper = 0.8,
+  log10_id70_mean = 4,
+  log10_id70_sd = 0.8,
+  log10_id70_lower = 3,
+  log10_id70_upper = 7
+)
+
+
+# Distribution settings for a and b
+# ab_p
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log(b) ~ Uniform(log(b_lower), log(b_upper))
+
+ab_settings <- list(
+  a_lower = 0.1,
+  a_upper = 0.7,
+  b_lower = 20,
+  b_upper = 600
+)
+
+prior_skeleton_table <- summarise_prior_implied_skeleton(
+  nsamp = 100000,
+  id70_settings = id70_settings,
+  ab_settings = ab_settings,
+  candidate_doses = 10^(3:7),
+  seed = 2025
+)
+
+# -------------------------------------------------------------------------
+# Format the prior-implied skeleton results
+# -------------------------------------------------------------------------
+
+prior_skeleton_formatted <- prior_skeleton_table %>%
+  dplyr::transmute(
+    dose_level = dose_level,
+    
+    challenge_dose = paste0(
+      "$10^{",
+      as.integer(log10(challenge_dose)),
+      "}$"
+    ),
+    
+    primary_median = sprintf(
+      "%.3f",
+      Primary_prior_median
+    ),
+    
+    primary_cri = sprintf(
+      "(%.3f, %.3f)",
+      Primary_lower_95,
+      Primary_upper_95
+    ),
+    
+    alternative_median = sprintf(
+      "%.3f",
+      Alternative_prior_median
+    ),
+    
+    alternative_cri = sprintf(
+      "(%.3f, %.3f)",
+      Alternative_lower_95,
+      Alternative_upper_95
+    )
+  )
+
+prior_skeleton_formatted %>%
+  kable(
+    caption = paste(
+      "Prior-implied infection probabilities at the candidate challenge",
+      "doses under the primary and alternative prior specifications."
+    ),
+    booktabs = TRUE,
+    align = rep("c", 6),
+    escape = FALSE,
+    col.names = c(
+      "Dose level",
+      "Challenge dose (CFU)",
+      "Prior median",
+      "95% prior CrI",
+      "Prior median",
+      "95% prior CrI"
+    )
+  ) %>%
+  add_header_above(
+    c(
+      " " = 2,
+      "Primary prior: $(a, \\mathrm{ID}_{70})$" = 2,
+      "Alternative prior: $(a,b)$" = 2
+    ),
+    bold = TRUE,
+    escape = FALSE
+  ) %>%
+  column_spec(1, width = "6em") %>%
+  column_spec(2, width = "10em") %>%
+  column_spec(3:6, width = "9em") %>%
+  footnote(
+    general = paste(
+      "Values are the prior median and pointwise 95% prior credible",
+      "interval (CrI) for the infection probability at each candidate",
+      "dose. The dose-specific prior medians form the descriptive",
+      "prior-implied skeleton under each prior specification."
+    ),
+    general_title = "Note: ",
+    footnote_as_chunk = TRUE
+  ) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c(
+      "striped",
+      "hover",
+      "condensed",
+      "bordered"
+    ),
+    latex_options = c(
+      "hold_position",
+      "scale_down"
+    )
+  )
+```
+

@@ -1,0 +1,654 @@
+---
+title: "Implementation Guide"
+subtitle: "Bayesian continual reassessment method for dose-finding in controlled human infection model studies"
+author:
+  - name: Chaya Weerasinghe
+date: last-modified
+format:
+  html:
+    toc: true
+    toc-depth: 4
+    number-sections: true
+    code-copy: true
+    code-fold: false
+    code-overflow: wrap
+    embed-resources: true
+    theme: cosmo
+execute:
+  echo: true
+  warning: false
+  message: false
+  cache: false
+---
+
+# Overview
+
+This guide describes the implementation of the Bayesian continual reassessment method (CRM) used in the accompanying manuscript. It covers:
+
+- generation of true dose-response parameter values;
+- specification and fitting of the Bayesian CRM;
+- simulation of one illustrative trial;
+- posterior updating after successive cohorts;
+- prior-predictive evaluation;
+- evaluation under five fixed dose-response scenarios;
+- implementation of the rule-based comparator; and
+- generation of operating-characteristic summaries, tables and figures.
+
+The primary focus of this guide is the Bayesian CRM. The complete implementation
+of the rule-based comparator is also provided in the accompanying repository.
+
+\
+
+# Software requirements
+
+The analysis requires R, Stan and the following R packages.
+
+```{r}
+#| label: load-packages
+
+library(here)
+library(tidyverse)
+library(rstan)
+library(truncnorm)
+library(kableExtra)
+```
+
+\
+
+# Repository structure
+
+```text
+crm-chim-tutorial/
+├── README.md
+├── LICENSE
+├── _quarto.yml
+├── implementation_guide.qmd
+│
+├── data/
+|
+├── data_gen/
+|
+├── bayesian_crm/
+|   ├── run_bcrm.R
+|   ├── run_bcrm_example.R
+│   ├── R/
+│   ├── data/
+|   ├── stan/
+│   └── results/
+│   
+├── rule_based/
+|   ├── run_rule_based.R
+│   ├── R/
+│   └── results/
+│
+├── fig_tables/
+│   ├── figures.Rmd
+│   ├── tables.Rmd
+|   ├── R/
+│   └── save_plots/
+└──
+```
+
+All paths are constructed relative to the project root using `here::here()`.
+The guide should therefore be rendered from within the R project.
+
+
+\
+
+
+# Generate true parameter values
+
+- True parameter values are required to simulate infection outcomes, and they are generated under two prior specifications:
+
+1. Prior distributions on $a$ and $\log_{10}(ID_{70})$; and
+2. Prior distributions on $a$ and $b$.
+
+- Also, under these two prior specifications, true parameter values are generated for two cases:
+
+1. Prior predictive evaluation
+2. Scenario-based evaluation
+
+\
+
+## Dose-response model
+
+The probability of infection at challenge dose $d$ is modelled as
+
+$$
+p(d)
+=
+1-
+\left(
+1+\frac{d}{b}
+\right)^{-a},
+$$
+
+where $a>0$ and $b>0$.
+
+The dose associated with target infection probability $p$ is
+
+$$
+ID_{p}
+=
+b
+\left\{
+(1-p)^{-1/a}-1
+\right\}.
+$$
+The target probability is $p=0.70$; therefore, the target infectious dose is denoted by $ID_{70}$.
+
+\
+
+
+## Prior specifications and the two types of simulation experiments
+
+### Specification of prior distributions and their hyperparameters
+
+1. Primary prior specification:
+$$
+\log(a) \sim \operatorname{Uniform} \{\log(0.3),\log(0.8)\},
+$$
+
+$$
+\log_{10}(ID_{70}) \sim N(4,0.8^2), \text{truncated to } (3,7).
+$$
+
+- For this prior specification, use `prior_spec <- "id70_p"`
+
+
+\
+
+
+2. Alternative prior specification:
+
+$$
+\log(a)v\sim \operatorname{Uniform} \{\log(0.1),\log(0.7)\},
+$$
+
+$$
+\log(b) \sim \operatorname{Uniform} \{\log(20),\log(600)\}.
+$$
+
+- For this prior specification, use `prior_spec <- "ab_p"`
+
+\
+
+Following part of the code shows the **hyper-parameter settings** that we have used in the above prior distributions.
+```{r}
+# 1. Primary prior specification: Prior on a and ID70
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log10(ID70) ~ Normal(log10_id70_mean, log10_id70_sd^2), truncated to (log10_id70_lower, log10_id70_upper)
+
+id70_settings <- list(
+  a_lower           = 0.3,
+  a_upper           = 0.8,
+  log10_id70_mean   = 4,
+  log10_id70_sd     = 0.8,
+  log10_id70_lower  = 3,
+  log10_id70_upper  = 7
+)
+
+# 2. Alternative prior: Prior on a and b
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log(b) ~ Uniform(log(b_lower), log(b_upper))
+
+ab_settings <- list(
+  a_lower = 0.1,
+  a_upper = 0.7,
+  b_lower = 20,
+  b_upper = 600
+)
+```
+
+
+\
+
+
+### Two types of simulation experiments
+
+- In the paper, we perform two types of simulation experiments: Prior predictive evaluation and Scenario-based evaluation. See Section 2.2.7 for more details.
+
+
+- For Prior predictive evaluation, use `generation_method <- "random"` and use `generation_method <- "scenarios"` for Scenario-based evaluation.
+```{r}
+# Select: "random" or "scenarios"
+generation_method <- "scenarios"
+```
+
+
+\
+
+## True parameter-generation functions
+
+| Function | Description | Location |
+|:---|:---|:---|
+| `generate_prior_draws()` | Generates true values of $a$, $b$, and $ID_{70}$ under the selected parameter-generation specification. | `data_gen/param_helpers.R`{style="color: black;"} |
+| `select_quantile_scenarios()` | Selects representative fixed scenarios at specified percentiles of the prior-generated $\log_{10}(ID_{70})$ distribution. | `data_gen/param_helpers.R`{style="color: black;"} |
+
+: Functions used to generate true dose-response parameters. {#tbl-parameter-functions}
+
+
+
+## Generate true parameters
+
+- Following function can be found in `data_gen/generate_parameters.R`{style="color: black;"}
+
+- For example, the following function generates the true parameter values used in scenario-based evaluation under the primary prior specification (Prior on $a$ and $ID_{70}$).
+
+```{r}
+# Load the parameter-generation functions
+source(here::here("data_gen", "param_helpers.R"))
+
+# -------------------------------------------------------------------------
+# User settings
+# -------------------------------------------------------------------------
+# Select the parameter-generation specification: "id70_p" or "ab_p"
+prior_spec <- "id70_p"
+
+# Select the output type: "random" or "scenarios"
+generation_method <- "scenarios"
+
+# Target infection probability used to define ID70
+target_prob <- 0.70
+
+# Number of parameter sets for the random option
+n_sim <- 1000
+
+# Number of initial draws used to select the quantile scenarios
+n_prior_draws <- 100000
+
+# Percentiles used for the quantile-scenarios option
+scenario_percent <- c(0.05, 0.25, 0.50, 0.75, 0.95)
+
+
+# Distribution settings 
+id70_settings <- list(
+  a_lower          = 0.3,
+  a_upper          = 0.8,
+  log10_id70_mean  = 4,
+  log10_id70_sd    = 0.8,
+  log10_id70_lower = 3,
+  log10_id70_upper = 7
+)
+
+ab_settings <- list(
+  a_lower = 0.1,
+  a_upper = 0.7,
+  b_lower = 20,
+  b_upper = 600
+)
+
+# -------------------------------------------------------------------------
+# Generate parameter values
+# -------------------------------------------------------------------------
+if (generation_method == "random") {
+  
+  set.seed(1)
+  
+  # Generate independent parameter sets for the simulation replicates
+  simulation_param <- generate_prior_draws(
+    n_draws       = n_sim,
+    prior_spec    = prior_spec,
+    target_prob   = target_prob,
+    id70_settings = id70_settings,
+    ab_settings   = ab_settings
+  )
+  
+} else if (generation_method == "scenarios") {
+  
+  set.seed(2025)
+  
+  # Generate a large sample from the selected parameter distributions
+  param_draws <- generate_prior_draws(
+    n_draws       = n_prior_draws,
+    prior_spec    = prior_spec,
+    target_prob   = target_prob,
+    id70_settings = id70_settings,
+    ab_settings   = ab_settings
+  )
+  
+  # Select representative scenarios at the requested ID70 percentiles
+  simulation_param <- select_quantile_scenarios(
+    param_draws      = param_draws,
+    scenario_percent = scenario_percent
+  )
+  
+} else {
+  
+  stop(
+    "`generation_method` must be either ",
+    "'random' or 'scenarios'."
+  )
+}
+
+head(simulation_param)
+```
+
+The resulting files are saved in `data/`.
+
+
+
+\
+
+
+# Bayesian CRM implementation
+
+## Core CRM functions
+
+| Function | Description | Location |
+|:---|:---|:---|
+| `dr.model()` | Calculates infection probabilities at specified challenge doses under the beta-Poisson model. | `bayesian_crm/R/helpers_crm.R`{style="color: black;"} |
+| `id.p()` | Calculates the dose associated with a specified infection probability. |`bayesian_crm/R/helpers_crm.R`{style="color: black;"} |
+| `my.sim.fn()` | Simulates infection outcomes for one cohort at a specified dose. | `bayesian_crm/R/helpers_crm.R`{style="color: black;"} |
+| `decision.criteria()` | Applies the posterior dose-allocation criteria and proposes the dose for the subsequent cohort. | `bayesian_crm/R/helpers_crm.R`{style="color: black;"} |
+| `update_crm_model()` | Fits the Bayesian model using all accumulated cohort data and calculates posterior summaries at one interim analysis. |`bayesian_crm/R/bcrm_model_update.R`{style="color: black;"} |
+| `run_bcrm()` | Runs repeated Bayesian CRM simulations for the prior-predictive or fixed-scenario evaluation. |`bayesian_crm/R/bcrm_simulation.R`{style="color: black;"} |
+
+: Core functions used to implement the Bayesian CRM. {#tbl-bcrm-functions}
+
+The functions are provided in: `bayesian_crm/R/`{style="color: black;"}
+
+
+\
+
+## Step-by-step Bayesian CRM implementation
+
+The main R script to run Bayesian CRM is described below, and can be found in `bayesian_crm/run_bcrm.R`{style="color: black;"}
+
+
+### Load CRM supporting functions
+```{r}
+source(here::here("bayesian_crm","R","helpers_crm.R"))
+source(here::here("bayesian_crm","R","bcrm_model_update.R"))
+source(here::here("bayesian_crm","R","bcrm_simulation.R"))
+```
+
+
+\
+
+### Candidate doses and trial settings
+
+Five candidate challenge doses are considered:
+
+$$
+10^3,\ 10^4,\ 10^5,\ 10^6,\ 10^7
+\quad \text{CFU}.
+$$
+
+The trial starts at $10^4$ CFU and uses cohorts of five participants.
+
+\
+
+### Dose-allocation rules
+
+After every completed cohort, the model is updated using all accumulated infection outcomes.
+
+At the most recently administered dose:
+
+- escalate by one $\log_{10}$ dose level if the 25th posterior percentile of the infection probability is below 0.60;
+- de-escalate by one $\log_{10}$ dose level if the 5th posterior percentile is above 0.80;
+- otherwise remain at the current dose.
+
+An accelerated escalation may be applied when the model-estimated $ID_{70}$ is above the initially proposed dose. Any escalation is restricted to no more than two $\log_{10}$ dose levels.
+
+See Section 2.2.6 of the main manuscript for further details.
+
+\
+
+### Stopping criteria
+
+The capped design stops when either:
+
+1. 20 participants have been challenged at the dose administered to the most recently completed cohort; or
+2. the total sample size reaches 35.
+
+The uncapped design applies only the first stopping criterion.
+
+- For capped and uncapped designs, use `cap_method <- "capped"` and  `cap_method <- "uncapped"`, respectively.
+
+\
+
+### User settings
+```{r}
+# Select: "capped" or "uncapped"
+cap_method <- "uncapped"
+
+# Maximum total sample size for the capped design
+# This setting is ignored when cap_method = "uncapped"
+N_cap <- 35
+
+# Select: "random" or "scenarios"
+generation_method <- "scenarios"
+
+# Select prior: "id70_p" or "ab_p"; id70_p = Prior on a and log10(ID70); ab_p = Prior on a and b
+prior_spec <- "ab_p"
+
+# Target infection probability used to define ID70
+target_prob <- 0.70
+
+# Prior distribution settings for a and log10(ID70)
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log10(ID70) ~ Normal(log10_id70_mean, log10_id70_sd^2), truncated to (log10_id70_lower, log10_id70_upper)
+id70_settings <- list(
+  a_lower          = 0.3,
+  a_upper          = 0.8,
+  log10_id70_mean  = 4,
+  log10_id70_sd    = 0.8,
+  log10_id70_lower = 3,
+  log10_id70_upper = 7
+)
+
+# Distribution settings for a and b
+# log(a) ~ Uniform(log(a_lower), log(a_upper))
+# log(b) ~ Uniform(log(b_lower), log(b_upper))
+ab_settings <- list(
+  a_lower = 0.1,
+  a_upper = 0.7,
+  b_lower = 20,
+  b_upper = 600
+)
+
+# Number of random parameter sets
+n_random <- 1000
+
+# Number of simulations per selected scenario
+n_sim_scenario <- 1000
+
+# Base simulation seed
+seed.no <- 250909
+
+# Starting dose and cohort size
+designs <- tibble(
+  start.dose = c(10^4),
+  group.size = c(5)
+)
+
+# Doses that can be administered
+target.doses <- c(10^3, 10^4, 10^5, 10^6, 10^7)
+
+# MCMC settings
+chains <- 4
+iter   <- 3000
+warmup <- 1000
+```
+
+
+\
+
+### Select and compile the Stan model
+```{r}
+#| eval: false
+
+stan_file <- switch(
+  prior_spec,
+  id70_p = "crm_dr_id70_prior.stan",
+  ab_p   = "crm_dr_ab_prior.stan"
+)
+
+compiled_model <- stan_model(here::here("bayesian_crm", "stan", stan_file))
+```
+
+
+\
+
+### Run simulations
+Once the settings above are specified by the user, the function below will run the specified number of Bayesian CRM simulations. This will run the simulations as described in Section 2.2.6.
+
+```{r}
+#| eval: false
+
+bcrm_results <- run_bcrm(
+  cap_method        = cap_method,
+  generation_method = generation_method,
+  prior_spec        = prior_spec,
+  target_prob       = target_prob,
+  id70_settings     = id70_settings,
+  ab_settings       = ab_settings,
+  N_cap             = N_cap,
+  n_random          = n_random,
+  n_sim_scenario    = n_sim_scenario,
+  seed.no           = seed.no,
+  designs           = designs,
+  target.doses      = target.doses,
+  compiled_model    = compiled_model,
+  chains            = chains,
+  iter              = iter,
+  warmup            = warmup,
+  save.output.to    = save.output.to
+)
+```
+
+This code is displayed but is not executed when the guide is rendered.
+
+\
+
+# Illustrative Bayesian CRM trial
+
+One simulated trial is used to illustrate how the dose allocation and posterior dose-response relationship evolve as infection outcomes accumulate.
+
+## Illustrative-trial function
+
+| Function | Description | Location
+|:---|:---|:---|
+| `run_bcrm_example()` | Runs one selected simulated CRM trial, saves its cohort-level outcomes, and records posterior dose-response summaries after each interim analysis. | `bayesian_crm/R/bcrm_example.R`{style="color: black;"}
+| `create_fig_posterior_updating()` | Creates a multi-panel figure showing the prior and posterior dose-response relationship after successive cohorts. | `fig_tables/R/fig_helpers.R`{style="color: black;"}
+
+: Functions used for the illustrative CRM example. {#tbl-example-functions}
+
+\
+
+## Load the illustrative-trial help functions
+```{r}
+source(here::here("bayesian_crm", "R", "helpers_crm.R"))
+source(here::here("bayesian_crm", "R", "bcrm_model_update.R"))
+source(here::here("bayesian_crm", "R", "bcrm_example.R"))
+```
+
+
+\
+
+## User settings and model compilation for one illustrative simulated trial
+The example below uses Scenario 4 and simulation replicate 45 under capped Bayesian CRM with primary prior specification.
+
+```{r}
+# -----------------------------------------------------------------------
+# User settings
+# -----------------------------------------------------------------------
+prior_spec <- "id70_p"
+cap_method <- "capped"
+
+# Paper example
+example_scenario <- 4
+example_sim <- 45
+
+target_prob <- 0.70
+N_cap <- 35
+seed.no <- 250909
+
+start.dose <- 10^4
+group.size <- 5
+
+target.doses <- 10^(3:7)
+
+
+# -----------------------------------------------------------------------
+# Prior settings
+# -----------------------------------------------------------------------
+id70_settings <- list(
+  a_lower          = 0.3,
+  a_upper          = 0.8,
+  log10_id70_mean  = 4,
+  log10_id70_sd    = 0.8,
+  log10_id70_lower = 3,
+  log10_id70_upper = 7
+)
+
+ab_settings <- list(
+  a_lower = 0.1,
+  a_upper = 0.7,
+  b_lower = 20,
+  b_upper = 600
+)
+
+
+# -----------------------------------------------------------------------
+# MCMC settings
+# -----------------------------------------------------------------------
+chains <- 4
+iter   <- 3000
+warmup <- 1000
+
+
+# -----------------------------------------------------------------------
+# Compile the selected Stan model
+# -----------------------------------------------------------------------
+stan_file <- switch(
+  prior_spec,
+  id70_p = "crm_dr_id70_prior.stan",
+  ab_p   = "crm_dr_ab_prior.stan"
+)
+
+compiled_model <- rstan::stan_model(
+  here::here(
+    "bayesian_crm",
+    "stan",
+    stan_file
+  )
+)
+```
+
+
+\
+
+## Run one simulated trial
+```{r}
+
+example_results <- run_bcrm_example(
+  scenario_no = example_scenario,
+  sim_no = example_sim,
+  prior_spec = prior_spec,
+  target_prob = target_prob,
+  id70_settings = id70_settings,
+  ab_settings = ab_settings,
+  cap_method = cap_method,
+  N_cap = N_cap,
+  seed.no = seed.no,
+  start.dose = start.dose,
+  group.size = group.size,
+  target.doses = target.doses,
+  compiled_model = compiled_model,
+  chains = chains,
+  iter = iter,
+  warmup = warmup,
+  save.output.to = example_output_folder
+)
+```
+
+\
+
+### Specific function explanation
+
+
+
+
+
