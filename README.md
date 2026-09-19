@@ -56,8 +56,8 @@ A working C++ toolchain is required to compile the Stan models.
 
 ## Implementation guide
 
-Detailed instructions are provided in the
-[Implementation Guide](implementation_guide.html).
+Detailed instructions and executable code are provided in the
+[`implementation_guide.qmd`](implementation_guide.qmd).
 
 The guide describes:
 
