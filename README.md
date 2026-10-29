@@ -56,8 +56,7 @@ A working C++ toolchain is required to compile the Stan models.
 
 ## Implementation guide
 
-Detailed instructions and executable code are provided in the
-[`implementation_guide.qmd`](implementation_guide.qmd).
+Detailed instructions and executable code are provided in the [HTML implementation guide](https://chaya-nw.github.io/crm-chim-tutorial/implementation_guide.html).
 
 The guide describes:
 
